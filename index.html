@@ -1,0 +1,493 @@
+
+<html>
+
+<head>
+<link rel="manifest" href="manifest.json" />
+
+<script src="sw9.js"></script>
+
+<script>
+
+if (location.protocol !== "https:") {
+  location.protocol = "https:";
+}
+
+        var price = null;
+        var showprice = null;
+        var updateinterval = 10000;
+        var initialprice = null;
+        var fsym = "";
+        var tsyms = null;
+        var coinsowned = [];
+        var ndigits = 6;
+
+        var params = [];
+
+        // time in which to expect an update
+        var interval = 30000;
+        var spd = 100;
+        var dp = .001 / spd;
+        var newdp = null;
+        var ddp = 0;
+        var lastprice = null;
+
+        var nclouds = 40;
+        var randomoffsets = [];
+        var scales = [];
+
+        var sw = null;
+
+        if ("serviceWorker" in navigator) {
+	        		
+        	navigator.serviceWorker.addEventListener('message', function(event) {
+	        	    
+	        	    if(event.data.oldprice && !lastprice){
+	        	    		lastprice = event.data.oldprice;
+		        	    a(true);
+	        	    	
+	        	    }
+	        	    
+	        	    
+	        	  });
+	        		
+	        		
+            navigator.serviceWorker.register("sw9.js").then(function(reg) {
+
+                if (Notification.permission == 'granted') {} else {
+                    Notification.requestPermission(function(status) {
+                        console.log('Notification permission status:', status);
+                    });
+                }
+                
+                /*
+                if ('periodicSync' in reg) {
+                    try {
+                        reg.periodicSync.register('content-sync', {
+                            
+                            minInterval: 1,
+                            minPeriod: 1
+                        });
+                    } catch (error) {
+                        console.log(error);
+                    }
+                }*/
+
+            }).catch(function(err) {
+
+                console.log(err);
+
+            });
+
+            a(false);
+
+            setInterval(function() {
+                a(true);
+            }, updateinterval);
+
+            
+            
+            
+            
+        }
+
+        
+        
+        const registration = navigator.serviceWorker.ready;
+        
+        
+        registration.then(function(reg)
+     	{
+        		if ('periodicSync' in reg) {
+                try {
+                    reg.periodicSync.register('content-sync', {
+                        
+                        minInterval: 1,
+                        minPeriod: 1
+                    });
+                } catch (error) {
+                    console.log(error);
+                }
+            }
+     	
+     	});
+        
+        		
+        		
+       
+        
+        
+        
+        for (i = 0; i < nclouds; i++) {
+            randomoffsets.push(Math.random());
+            scales.push(Math.random() * 1.9 + 0.2);
+        }
+
+        function setAnimation(index, speed) {
+
+            var scale = scales[index];
+
+            speed = (speed / scale) * 3;
+
+            var css = '.x' + index + ' {left: ' + (index - 2) * (1600 / nclouds) + 'px;' +
+                '-webkit-transform: scale(' + scale + ');' +
+                '-moz-transform: scale(' + scale + ');' +
+                'transform: scale(' + scale + ');opacity: ' + scale + ';}',
+
+                head = document.head || document.getElementsByTagName('head')[0],
+                style = document.createElement('style');
+
+            style.type = 'text/css';
+            if (style.styleSheet) {
+                style.styleSheet.cssText = css;
+            } else {
+                style.appendChild(document.createTextNode(css));
+            }
+
+            head.appendChild(style);
+
+        }
+
+        function animateStep(_price, _dp) {
+
+            for (i = 1; i <= nclouds; i++) {
+                var el = document.getElementsByClassName("x" + i)[0];
+
+                pp = (((_price - initialprice) / initialprice) * 4000000) * scales[i];
+                pp = pp + randomoffsets[i] * 3110 + 10000000;
+
+                newtop = (pp % 3110 - 200).toFixed(0) + 'px'
+
+                if (!(newtop === el.style.top)) {
+                    el.style.top = (pp % 3110 - 200).toFixed(0) + 'px';
+
+                }
+
+            }
+        }
+
+        function updatePrice(parsedPrice) {
+
+            if (!price) {} else {
+                newdp = (parsedPrice - showprice) * 1000 / interval;
+                newdp = newdp / spd;
+            }
+
+            ddp = (newdp - dp) / (updateinterval * spd / 1000);
+            price = parsedPrice;
+
+            if (initialprice == null) {
+                initialprice = price;
+            }
+
+            
+            //console.log("updatePrice called with showprice = " + showprice + ", lastprice = " + lastprice + ", price = "+ price);
+            
+            if (showprice == null && lastprice != null) {
+            	
+            		showprice = Number(price) - dp * 5000;
+                dp = Number(price) / 5000000;
+                
+                if(lastprice != null){
+                		
+                		newdp = (price - lastprice) * 1000 / interval;
+                		dp = 0;
+                		ddp = (newdp) / (100 * updateinterval * spd / 1000);
+                		showprice = lastprice;
+                		
+                		
+                }
+                
+                
+                
+            }
+
+        }
+
+        function a(rs) {
+
+            try {
+
+                if (!tsyms) {
+                    tsyms = "";
+                    var regex = /[?&]([^=#]+)=([^&#]*)/g,
+                        url = window.location.href,
+                        match;
+
+                    var f = false;
+
+                    while (match = regex.exec(url)) {
+                        params[match[1]] = match[2];
+
+                        if (match[1] != 'fsym') {
+                            coinsowned.push(match[1]);
+                            tsyms = tsyms + match[1] + ",";
+                        }
+
+                        f = true;
+                    }
+
+                    if (!f) {
+                        fsym = 'EUR';
+                        params['ETH'] = 0.137;
+                        params['ADA'] = 135.86300000;
+                        tsyms = 'ETH,ADA'
+                        coinsowned[0] = 'ETH';
+                        coinsowned[1] = 'ADA';
+
+                    } else {
+                        fsym = params["fsym"];
+                    }
+
+                }
+                
+                if(params.fsym){
+                		delete params.fsym;
+                }
+                
+                var url = "https://min-api.cryptocompare.com/data/price?fsym=" + fsym + "&tsyms=" + tsyms;
+
+                //window.localStorage.setItem('url', url);
+                //window.localStorage.setItem('coinsowned', coinsowned);
+
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({
+                        'url': url,
+                        'coins': params
+                    });
+                }
+				
+                if(rs){
+                		retrieveStock(updatePrice, params, url);
+                }
+                
+
+            } catch (err) {
+                console.log(err);
+            }
+        }
+
+        function b() {
+
+            var el = document.getElementsByClassName("valuetext")[0];
+
+            var sp = showprice;
+
+            if (!sp) {
+                setTimeout(function() {
+                    requestAnimationFrame(b);
+                }, 5);
+                return;
+            }
+
+            sp = sp.toPrecision(ndigits);
+
+            if (!dp || dp == 0) {
+                el.innerHTML = sp + ' ' + fsym;
+            } else if (dp < 0) {
+                el.style.color = 'red';
+                el.innerHTML = sp + ' ' + fsym;
+
+            } else if (dp > 0) {
+                el.style.color = 'green';
+                el.innerHTML = sp + ' ' + fsym;
+            }
+
+            //console.log(dp);
+
+            if (newdp != null) {
+                if (ddp > 0) {
+                    if (dp < newdp) {
+                        dp = dp + ddp;
+                    }
+
+                } else if (ddp < 0) {
+                    if (dp > newdp) {
+                        dp = dp + ddp;
+                    }
+                }
+
+            }
+
+            //console.log("newdp: " + newdp + " dp: " + dp + ", ddp: " + ddp);
+
+            showprice = showprice + dp;
+            animateStep(showprice, dp);
+
+            setTimeout(function() {
+                requestAnimationFrame(b);
+            }, 5);
+
+        }
+
+        window.onload = function() {
+            for (var i = 1; i <= nclouds; i++) {
+                setAnimation(i, 10);
+            }
+
+            requestAnimationFrame(b);
+
+            //no websockets yet
+
+            return;
+
+            if ("WebSocket" in window) {
+
+                // Let us open a web socket
+                var ws = new WebSocket("wss://streamer.cryptocompare.com/socket.io/?EIO=3&transport=websocket");
+
+                ws.onopen = function() {
+                    // Web Socket is connected, send data using send()
+                    //var t = '42["SubAdd",{"subs":["0~Cryptsy~ADA~USD","0~BTCChina~ADA~USD","0~Bitstamp~ADA~USD","0~OKCoin~ADA~USD","0~Coinbase~ADA~USD","0~Poloniex~ADA~USD","0~Cexio~ADA~USD","0~BTCE~ADA~USD","0~BitTrex~ADA~USD","0~Kraken~ADA~USD","0~Bitfinex~ADA~USD","0~LocalBitcoins~ADA~USD","0~itBit~ADA~USD","0~HitBTC~ADA~USD","0~Coinfloor~ADA~USD","0~Huobi~ADA~USD","0~LakeBTC~ADA~USD","0~Coinsetter~ADA~USD","0~CCEX~ADA~USD","0~MonetaGo~ADA~USD","0~Gatecoin~ADA~USD","0~Gemini~ADA~USD","0~CCEDK~ADA~USD","0~Exmo~ADA~USD","0~Yobit~ADA~USD","0~BitBay~ADA~USD","0~QuadrigaCX~ADA~USD","0~BitSquare~ADA~USD","0~TheRockTrading~ADA~USD","0~bitFlyer~ADA~USD","0~Quoine~ADA~USD","0~LiveCoin~ADA~USD","0~WavesDEX~ADA~USD","0~Lykke~ADA~USD","0~Remitano~ADA~USD","0~Coinroom~ADA~USD","0~Abucoins~ADA~USD","0~TrustDEX~ADA~USD"]}]';
+
+                    this.send(t);
+
+                    //"
+                    console.log("Message is sent...");
+                };
+
+                ws.onmessage = function(evt) {
+                    var received_msg = evt.data;
+                    console.log("Message is received... + " + evt.data);
+                };
+
+                ws.onclose = function() {
+                    // websocket is closed.
+                    console.log("Connection is closed...");
+                };
+
+                window.onbeforeunload = function(event) {
+                    socket.close();
+                };
+            } else {
+                // The browser doesn't support WebSocket
+                console.log("WebSocket NOT supported by your Browser!");
+            }
+
+        }
+    </script>
+
+<style>
+* {
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	/*To hide the horizontal scroller appearing during the animation*/
+	overflow: hidden;
+	background: #c9dbe9;
+}
+
+.cloud {
+	width: 200px;
+	height: 60px;
+	background: #fff;
+	border-radius: 200px;
+	-moz-border-radius: 200px;
+	-webkit-border-radius: 200px;
+	z-index: -1000;
+	position: absolute;
+}
+
+.cloud:before, .cloud:after {
+	content: '';
+	position: absolute;
+	background: #fff;
+	width: 100px;
+	height: 80px;
+	position: absolute;
+	top: -15px;
+	left: 10px;
+	z-index: -1000;
+	border-radius: 100px;
+	-moz-border-radius: 100px;
+	-webkit-border-radius: 100px;
+}
+/*
+.cloud{
+	animation: move 3s infinite;
+}
+@keyframes move {
+  100% {
+     transform: translate(-200px, 1000px);
+  }
+*/
+.cloud, .cloud:before, .cloud:after { //
+	box-shadow: 0 0 3px 3px #ffffff;
+}
+
+.cloud:before {
+	-webkit-transform: rotate(70deg);
+	transform: rotate(70deg);
+	-moz-transform: rotate(70deg);
+}
+
+.cloud:after {
+	width: 120px;
+	height: 120px;
+	top: -55px;
+	left: auto;
+	right: 15px;
+	-webkit-transform: rotate(33deg);
+	transform: rotate(33deg);
+	-moz-transform: rotate(33deg);
+}
+</style>
+</head>
+
+<body>
+	<div id="clouds">
+		<div class="cloud x1"></div>
+		<div class="cloud x2"></div>
+		<div class="cloud x3"></div>
+		<div class="cloud x4"></div>
+		<div class="cloud x5"></div>
+		<div class="cloud x6"></div>
+		<div class="cloud x7"></div>
+		<div class="cloud x8"></div>
+		<div class="cloud x9"></div>
+		<div class="cloud x10"></div>
+		<div class="cloud x11"></div>
+		<div class="cloud x12"></div>
+		<div class="cloud x13"></div>
+		<div class="cloud x14"></div>
+		<div class="cloud x15"></div>
+		<div class="cloud x16"></div>
+		<div class="cloud x17"></div>
+		<div class="cloud x18"></div>
+		<div class="cloud x19"></div>
+		<div class="cloud x20"></div>
+		<div class="cloud x21"></div>
+		<div class="cloud x22"></div>
+		<div class="cloud x23"></div>
+		<div class="cloud x24"></div>
+		<div class="cloud x25"></div>
+		<div class="cloud x26"></div>
+		<div class="cloud x27"></div>
+		<div class="cloud x28"></div>
+		<div class="cloud x29"></div>
+		<div class="cloud x30"></div>
+		<div class="cloud x31"></div>
+		<div class="cloud x32"></div>
+		<div class="cloud x33"></div>
+		<div class="cloud x34"></div>
+		<div class="cloud x35"></div>
+		<div class="cloud x36"></div>
+		<div class="cloud x37"></div>
+		<div class="cloud x38"></div>
+		<div class="cloud x39"></div>
+		<div class="cloud x40"></div>
+	</div>
+	<div class="content" style="z-index: 1000">
+
+		<div class="a" style="font-size: 4vw">
+			Value of your coins:&nbsp; <br />
+			<div class="valuetext" style="font-size: 12vw;"></div>
+			<br /> <br />
+			<div style="font-size: 10px">orange updater v. 1.1.0.0</div>
+		</div>
+
+	</div>
+<div style="text-align: right;position: fixed;z-index:9999999;bottom: 0;width: auto;right: 1%;cursor: pointer;line-height: 0;display:block !important;"><a title="Hosted on free web hosting 000webhost.com. Host your own website for FREE." target="_blank" href="https://www.000webhost.com/?utm_source=000webhostapp&utm_campaign=000_logo&utm_medium=website&utm_content=footer_img"><img src="https://cdn.000webhost.com/000webhost/logo/footer-powered-by-000webhost-white2.png" alt="www.000webhost.com"></a></div><script>function getCookie(t){for(var e=t+"=",n=decodeURIComponent(document.cookie).split(";"),o=0;o<n.length;o++){for(var a=n[o];" "==a.charAt(0);)a=a.substring(1);if(0==a.indexOf(e))return a.substring(e.length,a.length)}return""}getCookie("hostinger")&&(document.cookie="hostinger=;expires=Thu, 01 Jan 1970 00:00:01 GMT;",location.reload());var wordpressAdminBody=document.getElementsByClassName("wp-admin")[0],notification=document.getElementsByClassName("notice notice-success is-dismissible"),hostingerLogo=document.getElementsByClassName("hlogo"),mainContent=document.getElementsByClassName("notice_content")[0],wpSidebar=document.getElementById("adminmenuwrap"),wpTopBarRight=document.getElementById("wp-admin-bar-top-secondary");if(null!=wordpressAdminBody&&notification.length>0&&null!=mainContent){var googleFont=document.createElement("link");googleFontHref=document.createAttribute("href"),googleFontRel=document.createAttribute("rel"),googleFontHref.value="https://fonts.googleapis.com/css?family=Roboto:300,400,600",googleFontRel.value="stylesheet",googleFont.setAttributeNode(googleFontHref),googleFont.setAttributeNode(googleFontRel);var css="@media only screen and (max-width: 576px) {#main_content {max-width: 320px !important;} #main_content h1 {font-size: 30px !important;} #main_content h2 {font-size: 40px !important; margin: 20px 0 !important;} #main_content p {font-size: 14px !important;} #main_content .content-wrapper {text-align: center !important;}} @media only screen and (max-width: 781px) {#main_content {margin: auto; justify-content: center; max-width: 445px;} .upgrade-btn-sidebar {display: none;} #wp-toolbar .top-bar-upgrade-btn {width: 52px; height: 46px !important; padding: 0 !important;} .top-bar-upgrade-btn__text {display: none;} .dashicons-star-filled.top-bar-upgrade-btn__icon::before {font-size: 28px; margin-top: 10px; width: 28px; height: 28px;}} @media only screen and (max-width: 1325px) {.web-hosting-90-off-image-wrapper {position: absolute; max-width: 95% !important;} .notice_content {justify-content: center;} .web-hosting-90-off-image {opacity: 0.3;}} @media only screen and (min-width: 769px) {.notice_content {justify-content: space-between;} #main_content {margin-left: 5%; max-width: 445px;} .web-hosting-90-off-image-wrapper {position: absolute; right: 0; display: flex; padding: 0 5%}} @media only screen and (max-width: 960px) {.upgrade-btn-sidebar {border-radius: 0 !important; padding: 10px 0 !important; margin: 0 !important;} .upgrade-btn-sidebar__icon {display: block !important; margin: auto;} .upgrade-btn-sidebar__text {display: none;}}  .web-hosting-90-off-image {max-width: 90%; margin-top: 20px;} .content-wrapper {z-index: 5} .notice_content {display: flex; align-items: center;} * {-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;} .upgrade_button_red_sale{box-shadow: 0 2px 12px -6px #cc292f; max-width: 350px; border: 0; border-radius: 3px; background-color: #6747c7 !important; padding: 15px 55px !important;  margin-bottom: 48px; font-size: 14px; font-weight: 800; color: #ffffff;} .upgrade_button_red_sale:hover{color: #ffffff !important; background: rgba(103,71,199, 0.9) !important;} .upgrade-btn-sidebar {text-align:center;background-color:#ff4546;max-width: 350px;border-radius: 3px;border: 0;padding: 12px; margin: 20px 10px;display: block; font-size: 12px;color: #ffffff;font-weight: 700;text-decoration: none;} .upgrade-btn-sidebar:hover, .upgrade-btn-sidebar:focus, .upgrade-btn-sidebar:active {background-color: rgba(255,69,70, 0.9); color: #ffffff;} .upgrade-btn-sidebar__icon {display: none;} .top-bar-upgrade-btn {height: 100% !important; display: inline-block !important; padding: 0 10px !important; color: #ffffff; cursor: pointer;} .top-bar-upgrade-btn:hover, .top-bar-upgrade-btn:active, .top-bar-upgrade-btn:focus {background-color: #ff4546 !important; color: #ffffff !important;} .top-bar-upgrade-btn__icon {margin-right: 6px;}",style=document.createElement("style"),sheet=window.document.styleSheets[0];style.styleSheet?style.styleSheet.cssText=css:style.appendChild(document.createTextNode(css)),document.getElementsByTagName("head")[0].appendChild(style),document.getElementsByTagName("head")[0].appendChild(googleFont);var button=document.getElementsByClassName("upgrade_button_red")[0],link=button.parentElement;link.setAttribute("href","https://www.hostinger.com/hosting-starter-offer?utm_source=000webhost&utm_medium=panel&utm_campaign=000-wp"),link.innerHTML='<button class="upgrade_button_red_sale">Upgrade Now</button>',(notification=notification[0]).setAttribute("style","background-color: #f8f8f8; border-left-color: #6747c7 !important;"),notification.className="notice notice-error is-dismissible";var mainContentHolder=document.getElementById("main_content");mainContentHolder.setAttribute("style","padding: 0;"),hostingerLogo[0].remove();var h1Tag=notification.getElementsByTagName("H1")[0];h1Tag.className="000-h1",h1Tag.innerHTML="Limited Time Offer",h1Tag.setAttribute("style","color: #32454c;  margin-top: 48px; font-size: 48px; font-weight: 700;");var h2Tag=document.createElement("H2");h2Tag.innerHTML="From $0.79/month",h2Tag.setAttribute("style","color: #32454c; margin: 20px 0 45px 0; font-size: 48px; font-weight: 700;"),h1Tag.parentNode.insertBefore(h2Tag,h1Tag.nextSibling);var paragraph=notification.getElementsByTagName("p")[0];paragraph.innerHTML="Don’t miss the opportunity to enjoy up to <strong>4x WordPress Speed, Free SSL and all premium features</strong> available for a fraction of the price!",paragraph.setAttribute("style",'font-family: "Roboto", sans-serif; font-size: 18px; font-weight: 300; color: #6f7c81; margin-bottom: 20px;');var list=notification.getElementsByTagName("UL")[0];list.remove();var org_html=mainContent.innerHTML,new_html='<div class="content-wrapper">'+mainContent.innerHTML+'</div><div class="web-hosting-90-off-image-wrapper"><img class="web-hosting-90-off-image" src="https://cdn.000webhost.com/000webhost/promotions/wp-inject-default-img.png"></div>';mainContent.innerHTML=new_html;var saleImage=mainContent.getElementsByClassName("web-hosting-90-off-image")[0];wpSidebar.insertAdjacentHTML("beforeend",'<a href="https://www.hostinger.com/hosting-starter-offer?utm_source=000webhost&amp;utm_medium=panel&amp;utm_campaign=000-wp-sidebar" target="_blank" class="upgrade-btn-sidebar"><span class="dashicons dashicons-star-filled upgrade-btn-sidebar__icon"></span><span class="upgrade-btn-sidebar__text">Upgrade</span></a>'),wpTopBarRight.insertAdjacentHTML("beforebegin",'<a class="top-bar-upgrade-btn" href="https://www.hostinger.com/hosting-starter-offer?utm_source=000webhost&amp;utm_medium=panel&amp;utm_campaign=000-wp-top-bar" target="_blank"><span class="ab-icon dashicons-before dashicons-star-filled top-bar-upgrade-btn__icon"></span><span class="top-bar-upgrade-btn__text">Go Premium</span></a>')}</script><script type="text/javascript" src="https://a.opmnstr.com/app/js/api.min.js" data-campaign="f6brbmuxflyqoriatchv" data-user="71036" async></script></body>
+
+</html>
